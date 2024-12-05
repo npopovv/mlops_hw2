@@ -13,6 +13,11 @@ app = FastAPI()
 model_manager = ModelManager()
 
 
+# для DVC
+class DatasetRequest(BaseModel):
+    dataset_path: str = Field(..., description="Path to the dataset file")
+
+
 # валидация входных данных
 class TrainRequest(BaseModel):
     model_type: ModelType
@@ -112,3 +117,26 @@ async def status():
         "uptime": str(uptime),  # Формат времени работы
         "business_logic_metric": custom_metric,
     }
+
+
+@app.post("/datasets/save/")
+async def save_dataset(request: DatasetRequest):
+    """Сохранение датасета через DVC."""
+
+    try:
+        model_manager.save_dataset_with_dvc(request.dataset_path)
+        return {"status": "dataset saved"}
+    except Exception as e:
+        logger.error(f"Ошибка сохранения датасета: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/datasets/load/")
+async def load_dataset(dataset_name: str):
+    """Загрузка датасета через DVC."""
+    try:
+        local_path = model_manager.load_dataset_with_dvc(dataset_name)
+        return {"local_path": local_path}
+    except Exception as e:
+        logger.error(f"Ошибка загрузки датасета: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

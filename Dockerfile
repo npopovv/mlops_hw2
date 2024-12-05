@@ -2,10 +2,17 @@
 FROM python:3.12.3-slim
 
 # Устанавливаем зависимости системы
+# git для dvc
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     libffi-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+
+# Настройка Git
+RUN git config --global user.name "nkk" \
+    && git config --global user.email "nkk@gmail.com"
 
 # Устанавливаем рабочую директорию
 WORKDIR /app

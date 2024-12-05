@@ -1,0 +1,5 @@
+dvc init
+dvc remote add -d minio-storage s3://datasets
+dvc remote modify minio-storage endpointurl http://minio:9000
+dvc remote modify minio-storage ZwmA0JVJk333YEI78FVb
+dvc remote modify minio-storage j1na3IoYMOh4clk7Qy6mOAWbd6pbpOp4wUONgXmG

@@ -6,6 +6,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from minio import Minio
 from minio.error import S3Error
+import subprocess
+# import shutil
+# import requests
 
 # Настроенный логгер
 logger = setup_logger(name="model_manager")
@@ -17,17 +20,13 @@ class ModelType(str, Enum):
 
 
 class ModelManager:
-    def __init__(self, storage_dir="models_storage", bucket_name="models"):
+    def __init__(self, storage_dir="models_storage", bucket_name="models", dvc_bucket = "datasets"):
         """Инициализация менеджера моделей с поддержкой Minio."""
         self.storage_dir = storage_dir
         os.makedirs(self.storage_dir, exist_ok=True)
 
-        # print('*'*100)
-        # print(os.getenv("MINIO_ENDPOINT"))
-        # print('*'*100)
-        # http://minio:9000
-
         self.s3_bucket = bucket_name
+        self.dvc_bucket = dvc_bucket
         self.minio_client = Minio(
             os.getenv("MINIO_ENDPOINT"),#"minio:9000"
             access_key=os.getenv("MINIO_ACCESS_KEY"),
@@ -35,10 +34,15 @@ class ModelManager:
             secure=False,
         )
 
-        # Проверяем, существует ли бакет
+        # Проверяем, существует ли бакет для моделей и создаем если нет
         if not self.minio_client.bucket_exists(self.s3_bucket):
             self.minio_client.make_bucket(self.s3_bucket)
             logger.info(f"Bucket {self.s3_bucket} created")
+
+        # Проверяем, существует ли бакет для dvc
+        if not self.minio_client.bucket_exists(self.dvc_bucket):
+            self.minio_client.make_bucket(self.dvc_bucket)
+            logger.info(f"Bucket {self.dvc_bucket} created")
 
     def upload_to_minio(self, file_path):
         """Загрузка файла модели в Minio."""
@@ -139,3 +143,37 @@ class ModelManager:
         if not existing_models:
             return 1
         return max(model["id"] for model in existing_models) + 1
+    
+    def save_dataset_with_dvc(self, dataset_path: str):
+        """Сохранение датасета с версионированием через DVC."""
+
+        #проверка что получается подключиться к endpointurl
+        #response = requests.head('http://minio:9000', timeout=5)
+        #print(response, "http://minio:9000 доступно")
+
+        try:
+            # Добавляем файл в DVC
+            subprocess.run(["dvc", "add", dataset_path], check=True)
+            
+            # Коммит изменений в DVC
+            subprocess.run(["git", "add", dataset_path + ".dvc"], check=True)
+            subprocess.run(["git", "commit", "-m", f"Added dataset: {dataset_path}"], check=True)
+            
+            # Отправляем данные в удалённое хранилище
+            subprocess.run(["dvc", "push"], check=True)
+            logger.info(f"Dataset {dataset_path} saved to DVC.")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Ошибка при работе с DVC: {e}")
+            raise RuntimeError("DVC operation failed.")
+
+    def load_dataset_with_dvc(self, dataset_name: str):
+        """Загрузка датасета из DVC."""
+        try:
+            # Загружаем файл из DVC
+            subprocess.run(["dvc", "pull", dataset_name], check=True)
+            local_path = dataset_name  # Локальный путь после pull
+            logger.info(f"Dataset {dataset_name} успешно загружен через DVC.")
+            return local_path
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Ошибка при загрузке через DVC: {e}")
+            raise RuntimeError("DVC operation failed.")
