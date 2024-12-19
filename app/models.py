@@ -28,9 +28,9 @@ class ModelManager:
         self.s3_bucket = bucket_name
         self.dvc_bucket = dvc_bucket
         self.minio_client = Minio(
-            os.getenv("MINIO_ENDPOINT"),#"minio:9000"
-            access_key=os.getenv("MINIO_ACCESS_KEY"),
-            secret_key=os.getenv("MINIO_SECRET_KEY"),
+            "minio:9000",
+            access_key='access_key',
+            secret_key='secret_key',
             secure=False,
         )
 
